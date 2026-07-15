@@ -60,6 +60,19 @@ static EncodedAudioStream wav_encoder(&speaker_recording_file, new WAVEncoder())
 static bool recording_audio = false;
 static bool done_recording_audio = true;
 
+// Variables for in-memory recording (no SD card required)
+// The recording buffer lives in PSRAM (the Y-Board's ESP32-S3-WROOM-1-N8R2
+// has 2 MB), which fits about 23 seconds of audio at 44.1 kHz mono 16-bit
+static int max_recording_seconds = 10;
+static MemoryStream *rec_stream = nullptr;
+static EncodedAudioStream *wav_encoder_mem = nullptr;
+static size_t rec_size = 0;
+static bool rec_to_memory = false;
+static std::string rec_filename;
+
+// Source stream for the current file/recording playback
+static Stream *play_source = nullptr;
+
 //////////////////////////// Private Function Prototypes ///////////////////////
 // Local private functions
 static void play_speaker_task(void *params);
@@ -124,6 +137,52 @@ bool start_recording(const std::string &filename) {
     }
 
     // Set up initial state
+    rec_filename = filename;
+    rec_to_memory = false;
+    recording_audio = true;
+    done_recording_audio = false;
+
+    // Create the task to actually do the recording
+    xTaskCreate(recording_audio_task, "recording_audio_task", 4096, NULL, 1, NULL);
+
+    return true;
+}
+
+bool start_recording() {
+    if (recording_audio) {
+        Serial.println("Already recording audio");
+        return false;
+    }
+
+    if (!psramFound()) {
+        Serial.println("Error: Recording to memory requires PSRAM. Add -DBOARD_HAS_PSRAM to "
+                       "build_flags in platformio.ini.");
+        return false;
+    }
+
+    // If the speaker is currently playing this buffer, stop it before overwriting
+    if (play_source == rec_stream && is_playing()) {
+        stop_speaker();
+    }
+
+    // WAV header + raw PCM samples
+    size_t buffer_size = 44 + (size_t)micInfo.sample_rate * micInfo.channels *
+                                  (micInfo.bits_per_sample / 8) * max_recording_seconds;
+
+    if (rec_stream == nullptr) {
+        rec_stream = new MemoryStream(0, PS_RAM);
+        wav_encoder_mem = new EncodedAudioStream(rec_stream, new WAVEncoder());
+    }
+
+    if (!rec_stream->resize(buffer_size)) {
+        Serial.println("Error allocating memory for recording.");
+        return false;
+    }
+    rec_stream->begin(); // Reset read/write positions
+    rec_size = 0;
+
+    // Set up initial state
+    rec_to_memory = true;
     recording_audio = true;
     done_recording_audio = false;
 
@@ -134,22 +193,68 @@ bool start_recording(const std::string &filename) {
 }
 
 void recording_audio_task(void *params) {
-    wav_encoder.begin(micInfo);
-    copier.begin(wav_encoder, micVolume);
+    EncodedAudioStream &encoder = rec_to_memory ? *wav_encoder_mem : wav_encoder;
+    encoder.begin(micInfo);
+    copier.begin(encoder, micVolume);
 
     while (recording_audio) {
         copier.copy();
+
+        // Memory buffer full: stop automatically
+        if (rec_to_memory && rec_stream->availableForWrite() == 0) {
+            recording_audio = false;
+        }
     }
 
-    speaker_recording_file.flush();
-    speaker_recording_file.close();
-    wav_encoder.end();
+    if (rec_to_memory) {
+        rec_size = rec_stream->available();
+    } else {
+        speaker_recording_file.flush();
+        speaker_recording_file.close();
+    }
+    encoder.end();
 
     // Indicate to the main task that we are done
     done_recording_audio = true;
 
     // This task is done so delete itself
     vTaskDelete(NULL);
+}
+
+bool play_recording() {
+    if (recording_audio) {
+        Serial.println("Cannot play a recording while recording");
+        return false;
+    }
+
+    // The last recording went to a file, so play it from there
+    if (!rec_to_memory) {
+        if (rec_filename.empty()) {
+            Serial.println("No recording to play");
+            return false;
+        }
+        return play_sound_file(rec_filename);
+    }
+
+    if (rec_stream == nullptr || rec_size == 0) {
+        Serial.println("No recording to play");
+        return false;
+    }
+
+    stop_speaker();
+
+    // Rewind to the start of the recording
+    rec_stream->setValue(rec_stream->data(), rec_size, PS_RAM);
+
+    wav_decoder.end();
+    wav_decoder.begin();
+    copier.begin(wav_decoder, *rec_stream);
+    play_source = rec_stream;
+
+    playing_file = true;
+    xTaskNotifyGive(play_speaker_task_handle);
+
+    return true;
 }
 
 void stop_recording() {
@@ -165,6 +270,14 @@ void stop_recording() {
 bool is_recording() { return recording_audio; }
 
 void set_recording_gain(uint8_t new_gain) { micVolume.setVolume(new_gain); }
+
+void set_memory_recording_length(int seconds) {
+    if (seconds < 1) {
+        Serial.println("Recording length must be at least 1 second");
+        return;
+    }
+    max_recording_seconds = seconds;
+}
 
 I2SStream &get_speaker_stream() { return speakerOut; }
 
@@ -233,6 +346,7 @@ bool play_sound_file(const std::string &filename) {
         return false;
     }
 
+    play_source = &sound_file;
     playing_file = true;
     xTaskNotifyGive(play_speaker_task_handle);
 
@@ -447,7 +561,7 @@ void play_speaker_task(void *params) {
         if (playing_file) {
             // Keep copying until the file and copier is done
             while (playing_file &&
-                   !(copier.copy(poppingRemover) == 0 && sound_file.available() == 0))
+                   !(copier.copy(poppingRemover) == 0 && play_source->available() == 0))
                 ;
             playing_file = false;
         }

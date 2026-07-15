@@ -17,9 +17,12 @@ void stop_speaker();
 bool is_playing();
 bool play_sound_file(const std::string &filename);
 bool start_recording(const std::string &filename);
+bool start_recording();
+bool play_recording();
 void stop_recording();
 bool is_recording();
 void set_recording_gain(uint8_t new_gain);
+void set_memory_recording_length(int seconds);
 }; // namespace YAudio
 
 #endif /* YAUDIO_H */
