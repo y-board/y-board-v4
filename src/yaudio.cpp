@@ -61,10 +61,14 @@ static bool recording_audio = false;
 static bool done_recording_audio = true;
 
 // Variables for in-memory recording (no SD card required)
+// Maximum recording length, limited by where the buffer can be allocated
+static const int MAX_RECORDING_SECONDS_PSRAM = 10;
+static const int MAX_RECORDING_SECONDS_INTERNAL = 2;
 static MemoryStream *rec_stream = nullptr;
 static EncodedAudioStream *wav_encoder_mem = nullptr;
 static size_t rec_size = 0;
 static bool rec_to_memory = false;
+static std::string rec_filename;
 
 // Source stream for the current file/recording playback
 static Stream *play_source = nullptr;
@@ -133,6 +137,7 @@ bool start_recording(const std::string &filename) {
     }
 
     // Set up initial state
+    rec_filename = filename;
     rec_to_memory = false;
     recording_audio = true;
     done_recording_audio = false;
@@ -143,7 +148,7 @@ bool start_recording(const std::string &filename) {
     return true;
 }
 
-bool start_recording(int max_seconds) {
+bool start_recording() {
     if (recording_audio) {
         Serial.println("Already recording audio");
         return false;
@@ -155,6 +160,7 @@ bool start_recording(int max_seconds) {
     }
 
     // WAV header + raw PCM samples
+    int max_seconds = psramFound() ? MAX_RECORDING_SECONDS_PSRAM : MAX_RECORDING_SECONDS_INTERNAL;
     size_t buffer_size = 44 + (size_t)micInfo.sample_rate * micInfo.channels *
                                   (micInfo.bits_per_sample / 8) * max_seconds;
 
@@ -164,7 +170,7 @@ bool start_recording(int max_seconds) {
     }
 
     if (!rec_stream->resize(buffer_size)) {
-        Serial.println("Error allocating memory for recording. Try recording fewer seconds.");
+        Serial.println("Error allocating memory for recording.");
         return false;
     }
     rec_stream->begin(); // Reset read/write positions
@@ -214,6 +220,15 @@ bool play_recording() {
     if (recording_audio) {
         Serial.println("Cannot play a recording while recording");
         return false;
+    }
+
+    // The last recording went to a file, so play it from there
+    if (!rec_to_memory) {
+        if (rec_filename.empty()) {
+            Serial.println("No recording to play");
+            return false;
+        }
+        return play_sound_file(rec_filename);
     }
 
     if (rec_stream == nullptr || rec_size == 0) {
