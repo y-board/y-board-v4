@@ -22,7 +22,7 @@ bool play_recording();
 void stop_recording();
 bool is_recording();
 void set_recording_gain(uint8_t new_gain);
-void set_recording_length(int seconds);
+void set_memory_recording_length(int seconds);
 }; // namespace YAudio
 
 #endif /* YAUDIO_H */

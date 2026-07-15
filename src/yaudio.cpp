@@ -265,7 +265,7 @@ bool is_recording() { return recording_audio; }
 
 void set_recording_gain(uint8_t new_gain) { micVolume.setVolume(new_gain); }
 
-void set_recording_length(int seconds) {
+void set_memory_recording_length(int seconds) {
     if (seconds < 1) {
         Serial.println("Recording length must be at least 1 second");
         return;

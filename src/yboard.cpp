@@ -349,7 +349,9 @@ bool YBoardV4::is_recording() { return YAudio::is_recording(); }
 
 void YBoardV4::set_recording_volume(uint8_t volume) { YAudio::set_recording_gain(volume); }
 
-void YBoardV4::set_recording_length(int seconds) { YAudio::set_recording_length(seconds); }
+void YBoardV4::set_memory_recording_length(int seconds) {
+    YAudio::set_memory_recording_length(seconds);
+}
 
 I2SStream &YBoardV4::get_microphone_stream() { return YAudio::get_mic_stream(); }
 

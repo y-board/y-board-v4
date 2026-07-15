@@ -243,7 +243,7 @@ class YBoardV4 {
     /*
      *  This function starts recording audio from the microphone directly to
      * memory, so no SD card is required. The maximum length of the recording
-     * is 10 seconds by default and can be changed with set_recording_length.
+     * is 10 seconds by default and can be changed with set_memory_recording_length.
      * The return type is a boolean value (true or false). True corresponds to
      * the recording starting successfully, and false corresponds to an error
      * starting the recording (e.g., not enough memory). The recording stops
@@ -285,7 +285,7 @@ class YBoardV4 {
      * 23 seconds of audio; start_recording will return false if the length
      * does not fit in the available memory.
      */
-    void set_recording_length(int seconds);
+    void set_memory_recording_length(int seconds);
 
     /*
      * This function returns the microphone stream object which can be used to take
