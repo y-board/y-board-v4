@@ -339,6 +339,10 @@ bool YBoardV4::start_recording(const std::string &filename) {
     return YAudio::start_recording(_filename);
 }
 
+bool YBoardV4::start_recording(int max_seconds) { return YAudio::start_recording(max_seconds); }
+
+bool YBoardV4::play_recording() { return YAudio::play_recording(); }
+
 void YBoardV4::stop_recording() { YAudio::stop_recording(); }
 
 bool YBoardV4::is_recording() { return YAudio::is_recording(); }

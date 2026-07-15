@@ -241,6 +241,28 @@ class YBoardV4 {
     bool start_recording(const std::string &filename);
 
     /*
+     *  This function starts recording audio from the microphone directly to
+     * memory, so no SD card is required. The recording is limited by available
+     * memory: max_seconds is the maximum length of the recording (default 2
+     * seconds). The return type is a boolean value (true or false). True
+     * corresponds to the recording starting successfully, and false corresponds
+     * to an error starting the recording (e.g., not enough memory for
+     * max_seconds). The recording stops when stop_recording is called or
+     * max_seconds is reached, and can be played back with play_recording.
+     * Starting a new recording overwrites the previous one.
+     */
+    bool start_recording(int max_seconds = 2);
+
+    /*
+     *  This function plays the recording made with start_recording() (the
+     * in-memory version, not the SD card version). The return type is a boolean
+     * value (true or false). True corresponds to the playback starting
+     * successfully, and false corresponds to an error (e.g., no recording has
+     * been made). The recording can be played multiple times.
+     */
+    bool play_recording();
+
+    /*
      *  This function stops recording audio from the microphone.
      */
     void stop_recording();

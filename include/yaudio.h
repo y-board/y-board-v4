@@ -17,6 +17,8 @@ void stop_speaker();
 bool is_playing();
 bool play_sound_file(const std::string &filename);
 bool start_recording(const std::string &filename);
+bool start_recording(int max_seconds);
+bool play_recording();
 void stop_recording();
 bool is_recording();
 void set_recording_gain(uint8_t new_gain);
