@@ -61,9 +61,9 @@ static bool recording_audio = false;
 static bool done_recording_audio = true;
 
 // Variables for in-memory recording (no SD card required)
-// Maximum recording length, limited by where the buffer can be allocated
-static const int MAX_RECORDING_SECONDS_PSRAM = 10;
-static const int MAX_RECORDING_SECONDS_INTERNAL = 2;
+// The recording buffer lives in PSRAM (the Y-Board's ESP32-S3-WROOM-1-N8R2
+// has 2 MB), which fits about 23 seconds of audio at 44.1 kHz mono 16-bit
+static int max_recording_seconds = 10;
 static MemoryStream *rec_stream = nullptr;
 static EncodedAudioStream *wav_encoder_mem = nullptr;
 static size_t rec_size = 0;
@@ -160,12 +160,11 @@ bool start_recording() {
     }
 
     // WAV header + raw PCM samples
-    int max_seconds = psramFound() ? MAX_RECORDING_SECONDS_PSRAM : MAX_RECORDING_SECONDS_INTERNAL;
     size_t buffer_size = 44 + (size_t)micInfo.sample_rate * micInfo.channels *
-                                  (micInfo.bits_per_sample / 8) * max_seconds;
+                                  (micInfo.bits_per_sample / 8) * max_recording_seconds;
 
     if (rec_stream == nullptr) {
-        rec_stream = new MemoryStream(0, psramFound() ? PS_RAM : RAM);
+        rec_stream = new MemoryStream(0, PS_RAM);
         wav_encoder_mem = new EncodedAudioStream(rec_stream, new WAVEncoder());
     }
 
@@ -239,7 +238,7 @@ bool play_recording() {
     stop_speaker();
 
     // Rewind to the start of the recording
-    rec_stream->setValue(rec_stream->data(), rec_size, psramFound() ? PS_RAM : RAM);
+    rec_stream->setValue(rec_stream->data(), rec_size, PS_RAM);
 
     wav_decoder.end();
     wav_decoder.begin();
@@ -265,6 +264,14 @@ void stop_recording() {
 bool is_recording() { return recording_audio; }
 
 void set_recording_gain(uint8_t new_gain) { micVolume.setVolume(new_gain); }
+
+void set_recording_length(int seconds) {
+    if (seconds < 1) {
+        Serial.println("Recording length must be at least 1 second");
+        return;
+    }
+    max_recording_seconds = seconds;
+}
 
 I2SStream &get_speaker_stream() { return speakerOut; }
 

@@ -242,14 +242,14 @@ class YBoardV4 {
 
     /*
      *  This function starts recording audio from the microphone directly to
-     * memory, so no SD card is required. Because the recording is stored in
-     * memory, its length is limited: roughly 10 seconds on boards with PSRAM,
-     * or 2 seconds without. The return type is a boolean value (true or
-     * false). True corresponds to the recording starting successfully, and
-     * false corresponds to an error starting the recording (e.g., not enough
-     * memory). The recording stops when stop_recording is called or memory is
-     * full, and can be played back with play_recording. Starting a new
-     * recording overwrites the previous one.
+     * memory, so no SD card is required. The maximum length of the recording
+     * is 10 seconds by default and can be changed with set_recording_length.
+     * The return type is a boolean value (true or false). True corresponds to
+     * the recording starting successfully, and false corresponds to an error
+     * starting the recording (e.g., not enough memory). The recording stops
+     * when stop_recording is called or the maximum length is reached, and can
+     * be played back with play_recording. Starting a new recording overwrites
+     * the previous one.
      */
     bool start_recording();
 
@@ -277,6 +277,15 @@ class YBoardV4 {
      * an integer between 0 and 12. A volume of 0 is off, and a volume of 12 is full volume.
      */
     void set_recording_volume(uint8_t volume);
+
+    /*
+     *  This function sets the maximum length (in seconds) of recordings made
+     * to memory with start_recording. It only affects recordings started
+     * after it is called. Recordings are stored in PSRAM, which fits about
+     * 23 seconds of audio; start_recording will return false if the length
+     * does not fit in the available memory.
+     */
+    void set_recording_length(int seconds);
 
     /*
      * This function returns the microphone stream object which can be used to take
