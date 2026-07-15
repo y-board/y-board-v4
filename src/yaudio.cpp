@@ -154,6 +154,12 @@ bool start_recording() {
         return false;
     }
 
+    if (!psramFound()) {
+        Serial.println("Error: Recording to memory requires PSRAM. Add -DBOARD_HAS_PSRAM to "
+                       "build_flags in platformio.ini.");
+        return false;
+    }
+
     // If the speaker is currently playing this buffer, stop it before overwriting
     if (play_source == rec_stream && is_playing()) {
         stop_speaker();
